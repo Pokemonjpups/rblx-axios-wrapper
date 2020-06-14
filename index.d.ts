@@ -67,12 +67,12 @@ interface IClientOptions {
 /**
  * The reason for why the HTTP client was marked as bad. Some reasons will disable the client forever, while others will re-check until it is alive again.
  */
-export const ReasonForClientMarkedAsBad = {
-    'RequestTimeout': 1,
+export enum ReasonForClientMarkedAsBad {
+    'RequestTimeout' = 1,
     /**
      * If the client just cannot be used whatsoever, use this to tell http.js not to re-add it to the pool
      */
-    'DoNotReAddToPool': 2,
+    'DoNotReAddToPool' = 2,
 }
 
 /**
@@ -164,7 +164,7 @@ export namespace cookie {
     /**
      * This exception is thrown when a method requiring at least one cookie in the pool is called when the pool is empty
      */
-    export class EmptyPoolException extends Error {};
+    export class EmptyPoolException extends Error {}
     /**
      * Add a cooke (or array of cookies) to the cookie pool
      * 

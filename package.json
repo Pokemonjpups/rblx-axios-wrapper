@@ -1,6 +1,6 @@
 {
   "name": "rblx-axios-wrapper",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A light unofficial wrapper around axios for use with Roblox web endpoints.",
   "main": "index.js",
   "scripts": {
@@ -8,7 +8,7 @@
   },
   "author": "",
   "homepage": "https://github.com/Pokemonjpups/rblx-axios-wrapper",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "anticaptcha": "^2.0.3",
     "axios": "^0.19.2",
