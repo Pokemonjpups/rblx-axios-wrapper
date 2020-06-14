@@ -7,5 +7,12 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
-  "license": "ISC"
+  "homepage": "https://github.com/Pokemonjpups/rblx-axios-wrapper",
+  "license": "ISC",
+  "dependencies": {
+    "anticaptcha": "^2.0.3",
+    "axios": "^0.19.2",
+    "lodash": "^4.17.15",
+    "socks-proxy-agent": "^5.0.0"
+  }
 }
