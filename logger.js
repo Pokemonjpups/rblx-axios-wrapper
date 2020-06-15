@@ -1,4 +1,6 @@
 let log = console.log;
+// Chalk library
+const chalk = require('chalk');
 
 const logger = {
     // Enums
@@ -17,12 +19,12 @@ const logger = {
     },
     warn: (...args) => {
         if (logLevel >= logger.DebugLevel.Warnings) {
-            log('[rblx-axios-wrapper] [warn]',...args);
+            log('[rblx-axios-wrapper]',chalk.yellow('[warn]'),...args);
         }
     },
     err: (...args) => {
         if (logLevel >= logger.DebugLevel.Errors) {
-            log('[rblx-axios-wrapper] [err]',...args);
+            log('[rblx-axios-wrapper]',chalk.red('[err]'),...args);
         }
     },
     setLevel: (newLevel) => {
