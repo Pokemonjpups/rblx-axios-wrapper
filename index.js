@@ -1,15 +1,22 @@
 /// <reference path="index.d.ts" />
+
+// libraries
+const SocksProxyAgent = require('socks-proxy-agent');
+const axiosLib = require('axios').default;
+const sleep = require('util').promisify(setTimeout);
+const _ = require('lodash');
+const fs = require('fs');
+const crypto = require('crypto');
+const util = require('util');
+
+// log package
+const logger = require('./logger');
+
 let _proxyAgents = [];
 /**
  * @type {import('axios').AxiosInstance}
  */
 let _normalAgent;
-
-const SocksProxyAgent = require('socks-proxy-agent');
-const axiosLib = require('axios').default;
-
-const sleep = require('util').promisify(setTimeout);
-const _ = require('lodash');
 
 let _captchaProvider = undefined;
 let _maxPendingCaptchasAtOnce = 10;
@@ -39,6 +46,25 @@ const cookieToUserIdMap = new Map();
 let _failOnCodeErrors = false;
 
 /**
+ * Promised version of crypto.randomBytes(size, cb)
+ * @param {number} size 
+ * @returns {Promise<Buffer>}
+ */
+const randomBytesAsync = (size) => {
+    return new Promise((res, rej) => {
+        crypto.randomBytes(size, (err, buff) => {
+            if (err) {
+                return rej(err);
+            }else{
+                return res(buff);
+            }
+        })
+    })
+}
+
+const readFileAsync = util.promisify(fs.readFile);
+
+/**
  * Setup an axiosinstance with the proper csrf/http code intersceptors
  * @param {import('axios').AxiosInstance} proxy 
  */
@@ -50,7 +76,7 @@ const setupIntersceptors = (proxy) => {
     // @ts-ignore
     proxy._setupByHttp = true;
     // @ts-ignore
-    proxy.id = require('crypto').randomBytes(32).toString('hex');
+    proxy.id = (await randomBytesAsync(32)).toString('hex');
 
     let _lastUsedOkCsrf = 'null';
     proxy.interceptors.request.use(conf => {
@@ -135,10 +161,16 @@ const setupIntersceptors = (proxy) => {
         */
         let e = err;
         if (e && e.config && e.config.data && typeof e.config.data === 'string') {
-            e.config.data = JSON.parse(e.config.data);
+            logger.info('decoding request body to json. body is:',e.config.data);
+            try {
+                e.config.data = JSON.parse(e.config.data);
+            }catch(e) {
+                logger.err('could not decode json for request. data:',e.config.data,'type:',typeof e.config.data);
+            }
         }
         if (err && err.response) {
             if (err.response.status === 429) {
+                logger.warn('got 429 error with request url',e.config.url,'. retrying in 5k ms.');
                 return sleep(5000).then(() => {
                     return proxy.request(e.config)
                 });
@@ -157,6 +189,14 @@ const setupIntersceptors = (proxy) => {
                         }
                         if (_isMatch) {
                             if (item.code === type.code && item.message.toLowerCase() === type.message.toLowerCase()) {
+                                if (e && e.config && typeof e.config.data === 'undefined') {
+                                    logger.info('converting undefined body to empty object.');
+                                    e.config.data = {};
+                                }
+                                if (typeof e.config.data !== 'object') {
+                                    throw new http.RequestBodyMustBeObject('The request body must be an object when a captcha is required. Request URL: '+e.config.url+'. Method: '+e.config.method+'. Body type: '+typeof e.config.data)
+                                }
+                                logger.info('a captcha is required for request url',e.config.url,'. the message was: "',item.message,'". code:',item.code);
                                 e.config.data['captchaProvider'] = 'PROVIDER_ARKOSE_LABS';
                                 // temporary
                                 if (_pendingCaptchas >= _maxPendingCaptchasAtOnce) {
@@ -166,6 +206,7 @@ const setupIntersceptors = (proxy) => {
                                 return getPublicKey(type.keyName).then(loginKey => {
                                     // @ts-ignore
                                     return _captchaProvider(loginKey, proxy.getProxy()).then(captchaToken => {
+                                        logger.info('captcha finished. trying request');
                                         _pendingCaptchas--;
                                         e.config.data['captchaToken'] = captchaToken;
                                         return proxy.request(e.config)
@@ -269,6 +310,10 @@ const cookie = {
             _cookieArray.add(cookie);
         }
     },
+    addFromFile: async (fileName) => {
+        let cookies = (await readFileAsync(fileName)).toString().replace(/\r/g, '').split('\n').filter(val => {return !val === false});
+        http.cookie.add(cookies);
+    },
     validatePool: async () => {
         let cookieChunk = _.chunk(Array.from(_cookieArray), 1000);
         for (const chunk of cookieChunk) {
@@ -302,6 +347,7 @@ const cookie = {
         let cookieToGrab = _cookieSetAsArray[_randomCookieIndex];
         if (typeof cookieToGrab !== 'string') {
             _randomCookieIndex = 0;
+            logger.info('current cookie pool index(', _randomAxiosIndex, ') was empty. restarting index at 0');
             let firstVal = _cookieSetAsArray[0];
             if (typeof firstVal !== 'string') {
                 throw new cookie.EmptyPoolException('The cookie pool is empty! Register cookies with cookie.add()');
@@ -317,20 +363,31 @@ const cookie = {
     },
 }
 
+
+
+
 let _randomAxiosIndex = 0;
 const http = {
     // Errors
     ClientIsNotAProxyException: class extends Error { },
     NoProxiesAvailableException: class extends Error { },
+    RequestBodyMustBeObject: class extends Error { },
     // Enums
     ReasonForClientMarkedAsBad: {
         'RequestTimeout': 1,
         'DoNotReAddToPool': 2,
     },
+    DebugLevel: logger.DebugLevel,
     // Extra Objects
     captchaProviders: captchaProviders,
     // Cookie class
     cookie: cookie,
+    setDebug: (level) => {
+        logger.setLevel(level);
+    },
+    getDebug: () => {
+        return logger.getLevel;
+    },
     // Methods
     registerProxies: (proxyArr) => {
         if (!Array.isArray(proxyArr)) {
@@ -390,12 +447,14 @@ const http = {
             let msg = e.message.toLowerCase();
             // Check if there is an issue with the proxy
             if (msg.indexOf('socks5') !== -1 || msg.indexOf('proxy') !== -1 || msg.indexOf('socks') !== -1) {
+                logger.warn('client with id',axiosInstanceToGrab.id,'is bad. it is being removed from the pool and this request is being retried.','url:',e.config.url,'method:',e.config.method,'data?:',e.config.data);
                 // The proxy is bad. Put it on a timeout, then try again with a new client
                 http.badClient(axiosInstanceToGrab);
                 return http.client(options).request(_err.config);
             }
             // Check if there is an issue that cannot be solved by the library
             if (e.code && !_failOnCodeErrors) {
+                logger.err('got an',e.code,'error while making a request. url:',e.config.url,'method:',e.config.method,'data?:',e.config.data);
                 // auto-retry until OK
                 return axiosInstanceToGrab.request(e.config);
             }
@@ -428,12 +487,18 @@ const http = {
                 // See if the client is OK
                 client.get('https://www.roblox.com/robots.txt').then(res => {
                     if (res && res.status && res.status === 200) {
+                        logger.info('client with id',id,'is now ok. adding back to proxy pool');
                         // Client seems to be OK
                         _proxyAgents.push(client);
                         clearInterval(_retryInterval);
                     }
                 }).catch(err => {
                     // Client is still bad.
+                    let code = err.code;
+                    if (err.response && err.response.status) {
+                        code = err.response.status;
+                    }
+                    logger.warn('client with id',id,'is still bad. got this error:',code);
                 }).finally(() => {
                     _clientRequestPending = false;
                 });
@@ -459,6 +524,25 @@ const http = {
     },
     setCaptchaAsyncLimit: (limit) => {
         _maxPendingCaptchasAtOnce = limit;
+    },
+    addProxiesFromFile: (proxyFileDir) => {
+        let proxies = (await readFileAsync(proxyFileDir)).toString().replace(/\r/g, '').split('\n').filter(val => {return !val === false});
+        let proxyObjectArr = [];
+        for (const proxy of proxies) {
+            let data = proxy.split(':');
+            let ip = data[0];
+            let port = data[1];
+            let user = data[2];
+            let pass = data[3];
+            let obj = {
+                proxyAddress: ip,
+                proxyPort: port,
+                proxyLogin: user,
+                proxyPassword: pass,
+            };
+            proxyObjectArr.push(obj);
+        }
+        http.registerProxies(proxyObjectArr);
     },
 }
 module.exports = http;

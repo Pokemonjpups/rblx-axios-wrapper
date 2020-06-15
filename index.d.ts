@@ -84,6 +84,40 @@ export class ClientIsNotAProxyException extends Error {}
  */
 export class NoProxiesAvailableException extends Error {}
 
+export enum DebugLevel {
+    /**
+     * Only severe errors will be logged
+     */
+    'Default' = 0,
+    /**
+     * Only errors will be logged
+     */
+    'Errors' = 10,
+    /**
+     * Only warnings (and below) will be logged
+     */
+    'Warnings' = 20,
+    /**
+     * Function calls, http requests, etc, will be logged to the console
+     */
+    'Info' = 30,
+    /**
+     * Excessive logging. Will probably only be useful to those experience very strange issues, or those submitting PRs
+     */
+    'Debug' = 100,
+}
+
+/**
+ * Set the debug level. Useful if promises aren't resolving (for example)
+ * @param debugLevel 
+ */
+export function setDebug(debugLevel: DebugLevel): void;
+
+/**
+ * Get the current debug level
+ */
+export function getDebug(): number;
+
 /**
  * Register an array of proxies (or one proxy) into the proxy pool
  * @param proxyArr 
@@ -137,6 +171,17 @@ export function setCaptchaAsyncLimit(limit: number): void;
 export function failOnCodeErrors(bool: boolean): void;
 
 /**
+ * Add socks5 proxies to the pool from the provided {fileName}
+ * 
+ * The format of the proxy file is expected to be:
+ * `ipAddress:port:username:pass`, with each entry seperated by "\n" or "\r\n"
+ * 
+ * (username and pass are optional)
+ * @param fileName 
+ */
+export function addProxiesFromFile(fileName: string): Promise<void>
+
+/**
  * The default captcha providers included with this library.
  */
 export namespace captchaProviders {
@@ -172,6 +217,14 @@ export namespace cookie {
      * @param cookie 
      */
     export function add(cookie: string | string[]): void;
+
+    /**
+     * Add cookies from the specified file path to the cookie pool.
+     * 
+     * This method expects each cookie in the file to be seperated by "\n" or "\r\n"
+     * @param fileName 
+     */
+    export function addFromFile(fileName: string): Promise<void>;
 
     /**
      * Validate all cookies in the cookie pool and remove invalid ones. 
