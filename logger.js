@@ -1,7 +1,5 @@
 let log = console.log;
 
-let logLevel = logger.DebugLevel.Default;
-
 const logger = {
     // Enums
     DebugLevel: {
@@ -34,5 +32,7 @@ const logger = {
         return logLevel;
     },
 }
+
+let logLevel = logger.DebugLevel.Default;
 
 module.exports = logger;

@@ -76,7 +76,7 @@ const setupIntersceptors = (proxy) => {
     // @ts-ignore
     proxy._setupByHttp = true;
     // @ts-ignore
-    proxy.id = (await randomBytesAsync(32)).toString('hex');
+    proxy.id = crypto.randomBytes(32).toString('hex');
 
     let _lastUsedOkCsrf = 'null';
     proxy.interceptors.request.use(conf => {
@@ -311,7 +311,8 @@ const cookie = {
         }
     },
     addFromFile: async (fileName) => {
-        let cookies = (await readFileAsync(fileName)).toString().replace(/\r/g, '').split('\n').filter(val => {return !val === false});
+        let cookies = await readFileAsync(fileName); 
+        cookies = cookies.toString().replace(/\r/g, '').split('\n').filter(val => {return !val === false});
         http.cookie.add(cookies);
     },
     validatePool: async () => {
@@ -330,6 +331,11 @@ const cookie = {
                         let id = res.data.id;
                         cookieToUserIdMap.set(cookie, id);
                     }catch(err) {
+                        let code = err.code;
+                        if (err && err.response.status) {
+                            code = err.response.status;
+                        }
+                        logger.warn('invalid cookie detected. code:',code);
                         // console.log(err);
                         // todo: analyize performance implications of this
                         _cookieArray = new Set(Array.from(_cookieArray).filter(val => {
@@ -525,8 +531,9 @@ const http = {
     setCaptchaAsyncLimit: (limit) => {
         _maxPendingCaptchasAtOnce = limit;
     },
-    addProxiesFromFile: (proxyFileDir) => {
-        let proxies = (await readFileAsync(proxyFileDir)).toString().replace(/\r/g, '').split('\n').filter(val => {return !val === false});
+    addProxiesFromFile: async (proxyFileDir) => {
+        let proxies = await readFileAsync(proxyFileDir);
+        proxies = proxies.toString().replace(/\r/g, '').split('\n').filter(val => {return !val === false});
         let proxyObjectArr = [];
         for (const proxy of proxies) {
             let data = proxy.split(':');
