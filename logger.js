@@ -19,12 +19,12 @@ const logger = {
     },
     warn: (...args) => {
         if (logLevel >= this.DebugLevel.Warnings) {
-            log('[rblx-axios-wrapper] [info]',...args);
+            log('[rblx-axios-wrapper] [warn]',...args);
         }
     },
     err: (...args) => {
         if (logLevel >= this.DebugLevel.Errors) {
-            log('[rblx-axios-wrapper] [info]',...args);
+            log('[rblx-axios-wrapper] [err]',...args);
         }
     },
     setLevel: (newLevel) => {
