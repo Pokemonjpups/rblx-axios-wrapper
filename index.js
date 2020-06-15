@@ -419,6 +419,23 @@ const http = {
             _proxyAgents.push(axios);
         }
     },
+    validateClients: async () => {
+        let allClients = _proxyAgents;
+        let proms = [];
+        for (const agent of allClients) {
+            const processAgent = async () => {
+                // This is a bit weird, but it allows us to easily process the response without Promise.all() failing due to a failed request
+                await agent.get('https://www.roblox.com/robots.txt').then(result => {
+                // Client is OK
+                }).catch(err => {
+                    // Client is BAD
+                    http.badClient(agent);
+                })
+            }
+            proms.push(processAgent());
+        }
+        await Promise.all(proms);
+    },
     client: (options = undefined) => {
         // Grab an agent from the proxy pool
         /**

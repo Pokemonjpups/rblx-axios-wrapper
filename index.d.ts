@@ -119,6 +119,11 @@ export function setDebug(debugLevel: DebugLevel): void;
 export function getDebug(): number;
 
 /**
+ * Validate all clients in the pool. This will remove any bad clients.
+ */
+export function validateClients(): Promise<void>
+
+/**
  * Register an array of proxies (or one proxy) into the proxy pool
  * @param proxyArr 
  */
