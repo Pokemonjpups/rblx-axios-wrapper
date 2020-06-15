@@ -528,6 +528,9 @@ const http = {
                     if (err.response && err.response.status) {
                         code = err.response.status;
                     }
+                    if (!code) {
+                        code = err.message; // last resort...
+                    }
                     logger.warn('client with id',id,'is still bad. got this error:',code);
                 }).finally(() => {
                     _clientRequestPending = false;
