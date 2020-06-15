@@ -270,13 +270,14 @@ const cookie = {
         }
     },
     validatePool: async () => {
-        let cookieChunk = _.chunk(Array.from(_cookieArray), 100);
+        let cookieChunk = _.chunk(Array.from(_cookieArray), 1000);
         for (const chunk of cookieChunk) {
             let proms = [];
             for (const cookie of chunk) {
                 const handleCookie = async (cookie) => {
                     let cl = http.client({
                         useCookie: false,
+                        useProxy: false,
                     });
                     cl.cookie = cookie;
                     try {
