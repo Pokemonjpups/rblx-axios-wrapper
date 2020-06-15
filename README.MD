@@ -49,7 +49,7 @@ const proxy = {
 http.registerProxies(proxy);
 // Setup a captcha provider
 http.setCaptchaProvider(
-    // Provide one argument, the supplied antiCaptcha provider
+    // Provide one argument, the default built-in antiCaptcha provider
     http.captchaProviders.antiCaptcha('1234private-key-here1234')
 );
 // Replace this with the ID of the group to join
@@ -79,10 +79,51 @@ http.cookie.add('.ROBLOSECURITY=_|WARNING:-DO-NOT-SHARE-THIS.--Sharing-this-will
 
 // Main function
 const main = async () => {
-    // validate the pool (remove invalid cookies)
+    // validate the proxy (aka "clients") pool
+    // note: this isn't really required, and can take a long time depending on the speed of the proxies, but it is very helpful in preventing bugs from popping up early on
+    await http.validateClients();
+    // validate the cookie pool (remove invalid cookies)
     await http.cookie.validatePool();
     // join the group wtih a random cookie
     await joinGroup();
 }
 main();
+```
+
+---
+
+## Tutorials
+
+- **Adding support for a custom captcha provider.**
+If you want to use a captcha provider that is not already in this package, it is very easy to make your own.
+```js
+// You must make a method that takes two parameters
+// funCaptchaPublicKey - This is the fun captcha public key to use. The domain will usually be "www.roblox.com"
+// proxyObject - This is of the IProxyObject type. It is the proxy to use for the captcha solver program. A proxy is usually required for funcaptcha solvers
+// -
+// Your method must return a "Promise<string>", meaning it can be an async function (like the example below) that returns a string.
+// The string your method returns must be the captcha code to send to roblox
+// -
+const myCustomCaptchaProvider = async (funCaptchaPublicKey, proxyObject) => {
+    // Lets pretend we have a captcha solver thing here
+    const axios = require('axios').default;
+    // Pretend this is your captcha solver's API or something
+    const captchaResult = await axios.post('https://captcha-solver.example.com/solve-captcha', {
+        type: 'FunCaptcha',
+        domain: 'www.roblox.com',
+        publicKey: funCaptchaPublicKey,
+        proxy: proxyObject,
+    });
+    // Lets say the above example makes an http request that finishes when the captcha code is ready. When it's done, it'll return a string that is your captcha key.
+    // For example, we could just return this:
+    return captchaResult.data; // captchaResult.data - A string which is your completed captcha to submit to roblox
+}
+
+// After creating your method, you can register it like this:
+
+// Require the library
+const http = require('rblx-axios-wrapper');
+// Register your custom provider
+http.setCaptchaProvider(myCustomCaptchaProvider);
+// Then, whenever a captcha needs to be solved, your method (myCustomCaptchaProvider) will be called and awaited!
 ```
