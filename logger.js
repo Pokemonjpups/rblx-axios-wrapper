@@ -11,17 +11,17 @@ const logger = {
     },
     // Methods
     info: (...args) => {
-        if (logLevel >= this.DebugLevel.Info) {
+        if (logLevel >= logger.DebugLevel.Info) {
             log('[rblx-axios-wrapper] [info]',...args);
         }
     },
     warn: (...args) => {
-        if (logLevel >= this.DebugLevel.Warnings) {
+        if (logLevel >= logger.DebugLevel.Warnings) {
             log('[rblx-axios-wrapper] [warn]',...args);
         }
     },
     err: (...args) => {
-        if (logLevel >= this.DebugLevel.Errors) {
+        if (logLevel >= logger.DebugLevel.Errors) {
             log('[rblx-axios-wrapper] [err]',...args);
         }
     },
