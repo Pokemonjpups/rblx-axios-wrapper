@@ -134,7 +134,7 @@ const setupIntersceptors = (proxy) => {
         * @type {import('axios').AxiosError<{errors: any[]}>}
         */
         let e = err;
-        if (e.config.data && typeof e.config.data === 'string') {
+        if (e && e.config && e.config.data && typeof e.config.data === 'string') {
             e.config.data = JSON.parse(e.config.data);
         }
         if (err && err.response) {
