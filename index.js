@@ -370,7 +370,7 @@ const cookie = {
 }
 
 
-
+let _clientIdsWaitingForOK = [];
 
 let _randomAxiosIndex = 0;
 const http = {
@@ -478,6 +478,10 @@ const http = {
             throw new http.ClientIsNotAProxyException('Non-proxy clients cannot be marked as bad.');
         } else {
             let id = client.id;
+            if (_clientIdsWaitingForOK.includes(id)) {
+                return;
+            }
+            _clientIdsWaitingForOK.push(id);
             _proxyAgents = _proxyAgents.filter(el => {
                 return el.id !== id;
             });
@@ -494,6 +498,9 @@ const http = {
                 client.get('https://www.roblox.com/robots.txt').then(res => {
                     if (res && res.status && res.status === 200) {
                         logger.info('client with id',id,'is now ok. adding back to proxy pool');
+                        _clientIdsWaitingForOK = _clientIdsWaitingForOK.filter(val => {
+                            return val !== id;
+                        });
                         // Client seems to be OK
                         _proxyAgents.push(client);
                         clearInterval(_retryInterval);
