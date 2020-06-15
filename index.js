@@ -389,7 +389,7 @@ const http = {
             let e = _err;
             let msg = e.message.toLowerCase();
             // Check if there is an issue with the proxy
-            if (msg.indexOf('socks5') !== -1 || msg.indexOf('proxy') !== -1) {
+            if (msg.indexOf('socks5') !== -1 || msg.indexOf('proxy') !== -1 || msg.indexOf('socks') !== -1) {
                 // The proxy is bad. Put it on a timeout, then try again with a new client
                 http.badClient(axiosInstanceToGrab);
                 return http.client(options).request(_err.config);
