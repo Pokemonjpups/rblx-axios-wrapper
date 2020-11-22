@@ -167,8 +167,14 @@ const setupInterceptors = (proxy) => {
         if (err && err.response) {
             if (err.response.status === 429) {
                 logger.warn('got 429 error with request url', e.config.url, '. retrying in 5k ms.');
+                /*
                 return sleep(5000).then(() => {
                     return proxy.request(e.config)
+                });
+                */
+                return http.client({
+                    useCookie: typeof proxy.cookie === 'string',
+                    useProxy: true,
                 });
             } else if (err.response.status === 403) {
                 for (const item of e.response.data.errors) {
