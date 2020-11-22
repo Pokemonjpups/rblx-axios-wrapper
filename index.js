@@ -175,7 +175,7 @@ const setupInterceptors = (proxy) => {
                 return http.client({
                     useCookie: typeof proxy.cookie === 'string',
                     useProxy: true,
-                });
+                }).request(e.config);
             } else if (err.response.status === 403) {
                 for (const item of e.response.data.errors) {
                     for (const type of captchaErrorTypes) {
