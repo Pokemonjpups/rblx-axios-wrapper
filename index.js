@@ -9,12 +9,23 @@ const fs = require('fs');
 const crypto = require('crypto');
 const util = require('util');
 
+/**
+ * @typedef ExtendedAxiosInstanceProperties
+ * @property {string} id
+ * @property {string|undefined} cookie
+ * @property {() => any|false} getProxy
+ */
+
+/**
+ * @typedef {import('axios').AxiosInstance & ExtendedAxiosInstanceProperties} ExtendedAxiosInstance
+ */
+
 // log package
 const logger = require('./logger');
 
 let _proxyAgents = [];
 /**
- * @type {import('axios').AxiosInstance}
+ * @type {ExtendedAxiosInstance}
  */
 let _normalAgent;
 
@@ -23,11 +34,13 @@ let _maxPendingCaptchasAtOnce = 10;
 let _pendingCaptchas = 0;
 let publicKeys = [];
 const getPublicKey = async (key) => {
-    await _firstCaptchaSetupRequest;
+    if (!publicKeys) {
+        await backgroundTasks.updateCaptchaMetadata();
+    }
     for (const item of publicKeys) {
         if (item.type === key) {
             return item.value;
-        } 
+        }
     }
 }
 
@@ -45,30 +58,13 @@ const cookieToUserIdMap = new Map();
 
 let _failOnCodeErrors = false;
 
-/**
- * Promised version of crypto.randomBytes(size, cb)
- * @param {number} size 
- * @returns {Promise<Buffer>}
- */
-const randomBytesAsync = (size) => {
-    return new Promise((res, rej) => {
-        crypto.randomBytes(size, (err, buff) => {
-            if (err) {
-                return rej(err);
-            }else{
-                return res(buff);
-            }
-        })
-    })
-}
-
 const readFileAsync = util.promisify(fs.readFile);
-
 /**
  * Setup an axiosinstance with the proper csrf/http code intersceptors
  * @param {import('axios').AxiosInstance} proxy 
+ * @returns {void}
  */
-const setupIntersceptors = (proxy) => {
+const setupInterceptors = (proxy) => {
     //@ts-ignore
     if (proxy._setupByHttp) {
         return;
@@ -88,7 +84,7 @@ const setupIntersceptors = (proxy) => {
             // confirm we arent sending two cookies
             if (!conf.headers.cookie.match(/\.ROBLOSECURITY/g)) {
                 // @ts-ignore
-                conf.headers.cookie = '.ROBLOSECURITY='+proxy.cookie+'; '+conf.headers.cookie;
+                conf.headers.cookie = '.ROBLOSECURITY=' + proxy.cookie + '; ' + conf.headers.cookie;
             }
         }
         if (!conf.headers['x-csrf-token']) {
@@ -99,7 +95,7 @@ const setupIntersceptors = (proxy) => {
                     if (_otherCsrf) {
                         _lastUsedOkCsrf = _otherCsrf;
                     }
-                    
+
                 }
             }
             conf.headers['x-csrf-token'] = _lastUsedOkCsrf;
@@ -161,27 +157,27 @@ const setupIntersceptors = (proxy) => {
         */
         let e = err;
         if (e && e.config && e.config.data && typeof e.config.data === 'string') {
-            logger.info('decoding request body to json. body is:',e.config.data);
+            logger.info('decoding request body to json. body is:', e.config.data);
             try {
                 e.config.data = JSON.parse(e.config.data);
-            }catch(e) {
-                logger.err('could not decode json for request. data:',e.config.data,'type:',typeof e.config.data);
+            } catch (e) {
+                logger.err('could not decode json for request. data:', e.config.data, 'type:', typeof e.config.data);
             }
         }
         if (err && err.response) {
             if (err.response.status === 429) {
-                logger.warn('got 429 error with request url',e.config.url,'. retrying in 5k ms.');
+                logger.warn('got 429 error with request url', e.config.url, '. retrying in 5k ms.');
                 return sleep(5000).then(() => {
                     return proxy.request(e.config)
                 });
-            }else if (err.response.status === 403) {
+            } else if (err.response.status === 403) {
                 for (const item of e.response.data.errors) {
                     for (const type of captchaErrorTypes) {
                         let _isMatch = false;
                         for (const urlType of type.urls) {
                             let _matchUrl = e.config.url;
-                            if (_matchUrl.slice(_matchUrl.length-1) === '/') {
-                                _matchUrl = _matchUrl.slice(0,_matchUrl.length-1);
+                            if (_matchUrl.slice(_matchUrl.length - 1) === '/') {
+                                _matchUrl = _matchUrl.slice(0, _matchUrl.length - 1);
                             }
                             if (_matchUrl.match(urlType)) {
                                 _isMatch = true;
@@ -194,9 +190,9 @@ const setupIntersceptors = (proxy) => {
                                     e.config.data = {};
                                 }
                                 if (typeof e.config.data !== 'object') {
-                                    throw new http.RequestBodyMustBeObject('The request body must be an object when a captcha is required. Request URL: '+e.config.url+'. Method: '+e.config.method+'. Body type: '+typeof e.config.data)
+                                    throw new http.RequestBodyMustBeObject('The request body must be an object when a captcha is required. Request URL: ' + e.config.url + '. Method: ' + e.config.method + '. Body type: ' + typeof e.config.data)
                                 }
-                                logger.info('a captcha is required for request url',e.config.url,'. the message was: "',item.message,'". code:',item.code);
+                                logger.info('a captcha is required for request url', e.config.url, '. the message was: "', item.message, '". code:', item.code);
                                 e.config.data['captchaProvider'] = 'PROVIDER_ARKOSE_LABS';
                                 // temporary
                                 if (_pendingCaptchas >= _maxPendingCaptchasAtOnce) {
@@ -237,15 +233,20 @@ const setupIntersceptors = (proxy) => {
     });
 }
 
-(() => {
-    const generalAxiosAgent = axiosLib.create({});
-    setupIntersceptors(generalAxiosAgent);
+const rblxAxiosWrapperStartup = () => {
+    /**
+     * @type {ExtendedAxiosInstance}
+     */
     // @ts-ignore
+    const generalAxiosAgent = axiosLib.create({});
+    setupInterceptors(generalAxiosAgent);
     generalAxiosAgent.getProxy = () => {
         return false;
     }
+    // @ts-ignore
     _normalAgent = generalAxiosAgent;
-})();
+}
+rblxAxiosWrapperStartup();
 
 let _maxCaptchaSolveTime = Number.MAX_SAFE_INTEGER - 1;
 const captchaProviders = {
@@ -295,7 +296,7 @@ let _cookieArray = new Set();
 
 let _randomCookieIndex = 0;
 const cookie = {
-    EmptyPoolException: class extends Error {},
+    EmptyPoolException: class extends Error { },
     add: (val) => {
         if (!Array.isArray(val)) {
             let cookieItem = val;
@@ -304,15 +305,15 @@ const cookie = {
         }
 
         for (let cookie of val) {
-            if (cookie.slice(0,'.ROBLOSECURITY='.length) === '.ROBLOSECURITY=') {
+            if (cookie.slice(0, '.ROBLOSECURITY='.length) === '.ROBLOSECURITY=') {
                 cookie = cookie.slice('.ROBLOSECURITY='.length);
             }
             _cookieArray.add(cookie);
         }
     },
     addFromFile: async (fileName) => {
-        let cookies = await readFileAsync(fileName); 
-        cookies = cookies.toString().replace(/\r/g, '').split('\n').filter(val => {return !val === false});
+        let cookiesFile = (await readFileAsync(fileName)).toString();
+        let cookies = cookiesFile.toString().replace(/\r/g, '').split('\n').filter(val => { return !val === false });
         http.cookie.add(cookies);
     },
     validatePool: async () => {
@@ -330,12 +331,12 @@ const cookie = {
                         let res = await cl.get('https://users.roblox.com/v1/users/authenticated');
                         let id = res.data.id;
                         cookieToUserIdMap.set(cookie, id);
-                    }catch(err) {
+                    } catch (err) {
                         let code = err.code;
                         if (err && err.response.status) {
                             code = err.response.status;
                         }
-                        logger.warn('invalid cookie detected. code:',code);
+                        logger.warn('invalid cookie detected. code:', code);
                         // console.log(err);
                         // todo: analyize performance implications of this
                         _cookieArray = new Set(Array.from(_cookieArray).filter(val => {
@@ -359,7 +360,7 @@ const cookie = {
                 throw new cookie.EmptyPoolException('The cookie pool is empty! Register cookies with cookie.add()');
             }
             return firstVal;
-        }else{
+        } else {
             _randomCookieIndex++;
             return cookieToGrab;
         }
@@ -411,7 +412,7 @@ const http = {
             const axios = axiosLib.create({
                 httpsAgent: httpsAgent,
             });
-            setupIntersceptors(axios);
+            setupInterceptors(axios);
             // @ts-ignore
             axios.getProxy = () => {
                 return proxy;
@@ -426,7 +427,7 @@ const http = {
             const processAgent = async () => {
                 // This is a bit weird, but it allows us to easily process the response without Promise.all() failing due to a failed request
                 await agent.get('https://www.roblox.com/robots.txt').then(result => {
-                // Client is OK
+                    // Client is OK
                 }).catch(err => {
                     // Client is BAD
                     http.badClient(agent);
@@ -439,7 +440,7 @@ const http = {
     client: (options = undefined) => {
         // Grab an agent from the proxy pool
         /**
-         * @type {import('axios').AxiosInstance}
+         * @type {ExtendedAxiosInstance}
          */
         let axiosInstanceToGrab = _proxyAgents[_randomAxiosIndex];
         if (options) {
@@ -470,14 +471,14 @@ const http = {
             let msg = e.message.toLowerCase();
             // Check if there is an issue with the proxy
             if (msg.indexOf('socks5') !== -1 || msg.indexOf('proxy') !== -1 || msg.indexOf('socks') !== -1) {
-                logger.warn('client with id',axiosInstanceToGrab.id,'is bad. it is being removed from the pool and this request is being retried.','url:',e.config.url,'method:',e.config.method,'data?:',e.config.data);
+                logger.warn('client with id', axiosInstanceToGrab.id, 'is bad. it is being removed from the pool and this request is being retried.', 'url:', e.config.url, 'method:', e.config.method, 'data?:', e.config.data);
                 // The proxy is bad. Put it on a timeout, then try again with a new client
                 http.badClient(axiosInstanceToGrab);
                 return http.client(options).request(_err.config);
             }
             // Check if there is an issue that cannot be solved by the library
             if (e.code && !_failOnCodeErrors) {
-                logger.err('got an',e.code,'error while making a request. url:',e.config.url,'method:',e.config.method,'data?:',e.config.data);
+                logger.err('got an', e.code, 'error while making a request. url:', e.config.url, 'method:', e.config.method, 'data?:', e.config.data);
                 // auto-retry until OK
                 return axiosInstanceToGrab.request(e.config);
             }
@@ -485,7 +486,7 @@ const http = {
             return Promise.reject(e);
         })
         if (options && options.useCookie) {
-            axiosInstanceToGrab.defaults.headers['cookie'] = '.ROBLOSECURITY='+cookie.get();
+            axiosInstanceToGrab.defaults.headers['cookie'] = '.ROBLOSECURITY=' + cookie.get();
         }
         return axiosInstanceToGrab;
     },
@@ -514,7 +515,7 @@ const http = {
                 // See if the client is OK
                 client.get('https://www.roblox.com/robots.txt').then(res => {
                     if (res && res.status && res.status === 200) {
-                        logger.info('client with id',id,'is now ok. adding back to proxy pool');
+                        logger.info('client with id', id, 'is now ok. adding back to proxy pool');
                         _clientIdsWaitingForOK = _clientIdsWaitingForOK.filter(val => {
                             return val !== id;
                         });
@@ -531,7 +532,7 @@ const http = {
                     if (!code) {
                         code = err.message; // last resort...
                     }
-                    logger.warn('client with id',id,'is still bad. got this error:',code);
+                    logger.warn('client with id', id, 'is still bad. got this error:', code);
                 }).finally(() => {
                     _clientRequestPending = false;
                 });
@@ -541,9 +542,9 @@ const http = {
     disableMap: (option) => {
         if (option === 'csrf') {
             _disableCookieToCsrfMap = true;
-        }else if (option === 'userId') {
+        } else if (option === 'userId') {
             _disableCookieToUserIdMap = true;
-        }else if (option === 'all') {
+        } else if (option === 'all') {
             _disableCookieToCsrfMap = true;
             _disableCookieToUserIdMap = true;
         }
@@ -559,8 +560,8 @@ const http = {
         _maxPendingCaptchasAtOnce = limit;
     },
     addProxiesFromFile: async (proxyFileDir) => {
-        let proxies = await readFileAsync(proxyFileDir);
-        proxies = proxies.toString().replace(/\r/g, '').split('\n').filter(val => {return !val === false});
+        let proxiesFile = (await readFileAsync(proxyFileDir)).toString();
+        let proxies = proxiesFile.toString().replace(/\r/g, '').split('\n').filter(val => { return !val === false });
         let proxyObjectArr = [];
         for (const proxy of proxies) {
             let data = proxy.split(':');
@@ -581,15 +582,23 @@ const http = {
 }
 module.exports = http;
 
-// update captcha stuff
-let _firstCaptchaSetupRequest = http.client().get('https://captcha.roblox.com/v1/captcha/metadata').then(res => {
-    publicKeys = res.data.funCaptchaPublicKeys;
-})
-setInterval(() => {
-    // update captcha stuff
-    http.client({}).get('https://captcha.roblox.com/v1/captcha/metadata').then(res => {
-        publicKeys = res.data.funCaptchaPublicKeys;
-    }).catch(err => {
-        console.error(err);
-    })
-}, 60 * 1000);
+const backgroundTasks = {
+    main: () => {
+        backgroundTasks.updateCaptchaMetadata();
+        setInterval(() => {
+            backgroundTasks.updateCaptchaMetadata();
+        }, 60 * 1000);
+    },
+    updateCaptchaMetadata: () => {
+        return http.client({}).get('https://captcha.roblox.com/v1/captcha/metadata').then(res => {
+            publicKeys = res.data.funCaptchaPublicKeys;
+        }).catch(err => {
+            if (logger.getLevel() >= logger.DebugLevel.Warnings) {
+                logger.warn('Could not get captcha keys metadata', err);
+            }
+        });
+    },
+}
+
+// Run BG tasks
+backgroundTasks.main();
