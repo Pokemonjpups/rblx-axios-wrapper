@@ -449,7 +449,7 @@ const http = {
         }
         await Promise.all(proms);
     },
-    getProxyAgents: () => {
+    getClients: () => {
         return _proxyAgents;
     },
     client: (options = undefined) => {
