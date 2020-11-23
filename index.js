@@ -156,6 +156,9 @@ const setupInterceptors = (proxy) => {
         * @type {import('axios').AxiosError<{errors: any[]}>}
         */
         let e = err;
+        if (!e.isAxiosError) {
+            return Promise.reject(e);
+        }
         if (e && e.config && e.config.data && typeof e.config.data === 'string') {
             logger.info('decoding request body to json. body is:', e.config.data);
             try {
