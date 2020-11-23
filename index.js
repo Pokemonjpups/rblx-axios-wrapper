@@ -175,10 +175,13 @@ const setupInterceptors = (proxy) => {
                     return proxy.request(e.config)
                 });
                 */
-                return http.client({
-                    useCookie: typeof proxy.cookie === 'string',
-                    useProxy: true,
-                }).request(e.config);
+                return sleep(2500).then(() => {
+                    return http.client({
+                        // @ts-ignore
+                        useCookie: typeof proxy.cookie === 'string',
+                        useProxy: true,
+                    }).request(e.config);
+                });
             } else if (err.response.status === 403) {
                 for (const item of e.response.data.errors) {
                     for (const type of captchaErrorTypes) {
