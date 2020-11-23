@@ -12,6 +12,7 @@
     "dependencies": {
         "anticaptcha": "^2.0.3",
         "axios": "^0.19.2",
+        "axios-cached-dns-resolve": "^0.5.2",
         "chalk": "^4.1.0",
         "lodash": "^4.17.15",
         "socks-proxy-agent": "^5.0.0"

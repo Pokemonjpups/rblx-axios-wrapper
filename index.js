@@ -58,6 +58,8 @@ const cookieToUserIdMap = new Map();
 
 let _failOnCodeErrors = false;
 
+const { registerInterceptor } = require('axios-cached-dns-resolve');
+
 const readFileAsync = util.promisify(fs.readFile);
 /**
  * Setup an axiosinstance with the proper csrf/http code intersceptors
@@ -73,6 +75,7 @@ const setupInterceptors = (proxy) => {
     proxy._setupByHttp = true;
     // @ts-ignore
     proxy.id = crypto.randomBytes(32).toString('hex');
+    registerInterceptor(proxy);
 
     let _lastUsedOkCsrf = 'null';
     proxy.interceptors.request.use(conf => {
