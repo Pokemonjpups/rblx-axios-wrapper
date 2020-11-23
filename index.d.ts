@@ -78,11 +78,11 @@ export enum ReasonForClientMarkedAsBad {
 /**
  * This exception is thrown when a method requires an agent with a proxy, but an agent without a proxy was provided.
  */
-export class ClientIsNotAProxyException extends Error {}
+export class ClientIsNotAProxyException extends Error { }
 /**
  * This exception is thrown when a proxy is required but no proxies are available
  */
-export class NoProxiesAvailableException extends Error {}
+export class NoProxiesAvailableException extends Error { }
 
 export enum DebugLevel {
     /**
@@ -133,6 +133,11 @@ export function registerProxies(proxyArr: IProxyObject[] | IProxyObject): void;
  */
 // TODO: If options.useCookie === true, then return type is ExtendedAxiosInstanceWithCookie. Otherwise, return type is ExtendedAxiosInstance
 export function client<ClientOptions>(options?: IClientOptions): ExtendedAxiosInstance;
+
+/**
+ * Get a mutable array of proxy agents/clients
+ */
+export function getClients(): ExtendedAxiosInstance[];
 
 /**
  * Report a client as bad. This is normally handled automatically, but you may still need this method in some situations.
@@ -214,7 +219,7 @@ export namespace cookie {
     /**
      * This exception is thrown when a method requiring at least one cookie in the pool is called when the pool is empty
      */
-    export class EmptyPoolException extends Error {}
+    export class EmptyPoolException extends Error { }
     /**
      * Add a cooke (or array of cookies) to the cookie pool
      * 

@@ -449,6 +449,9 @@ const http = {
         }
         await Promise.all(proms);
     },
+    getProxyAgents: () => {
+        return _proxyAgents;
+    },
     client: (options = undefined) => {
         // Grab an agent from the proxy pool
         /**
