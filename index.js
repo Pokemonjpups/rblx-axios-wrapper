@@ -483,6 +483,9 @@ const http = {
              * @type {import('axios').AxiosError}
              */
             let e = _err;
+            if (!e.isAxiosError) {
+                return Promise.reject(e);
+            }
             let msg = e.message.toLowerCase();
             // Check if there is an issue with the proxy
             if (msg.indexOf('socks5') !== -1 || msg.indexOf('proxy') !== -1 || msg.indexOf('socks') !== -1) {
