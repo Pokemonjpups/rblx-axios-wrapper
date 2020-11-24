@@ -1,6 +1,6 @@
 {
     "name": "rblx-axios-wrapper",
-    "version": "0.1.163",
+    "version": "0.1.164",
     "description": "A light unofficial wrapper around axios for use with Roblox web endpoints.",
     "main": "index.js",
     "scripts": {
