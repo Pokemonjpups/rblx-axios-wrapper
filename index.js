@@ -488,11 +488,13 @@ const http = {
             }
             let msg = e.message.toLowerCase();
             // Check if there is an issue with the proxy
-            if (msg.indexOf('socks5') !== -1 || msg.indexOf('proxy') !== -1 || msg.indexOf('socks') !== -1) {
-                logger.warn('client with id', axiosInstanceToGrab.id, 'is bad. it is being removed from the pool and this request is being retried.', 'url:', e.config.url, 'method:', e.config.method, 'data?:', e.config.data);
-                // The proxy is bad. Put it on a timeout, then try again with a new client
-                http.badClient(axiosInstanceToGrab);
-                return http.client(options).request(_err.config);
+            if (axiosInstanceToGrab.getProxy()) {
+                if (msg.indexOf('socks5') !== -1 || msg.indexOf('proxy') !== -1 || msg.indexOf('socks') !== -1) {
+                    logger.warn('client with id', axiosInstanceToGrab.id, 'is bad. it is being removed from the pool and this request is being retried.', 'url:', e.config.url, 'method:', e.config.method, 'data?:', e.config.data);
+                    // The proxy is bad. Put it on a timeout, then try again with a new client
+                    http.badClient(axiosInstanceToGrab);
+                    return http.client(options).request(_err.config);
+                }
             }
             // Check if there is an issue that cannot be solved by the library
             if (e.code && !_failOnCodeErrors) {
